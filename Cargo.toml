@@ -1,0 +1,16 @@
+[package]
+name = "cli-template"
+version = "0.1.0"
+edition = "2018"
+license = "WTFPL"
+publish = false
+
+[dependencies]
+clap = "2.33.3"
+solana-clap-utils = "1.4.8"
+solana-cli-config = "1.4.8"
+solana-client = "1.4.8"
+solana-logger = "1.4.8"
+solana-sdk = "1.4.8"
+
+[workspace]
