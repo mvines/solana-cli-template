@@ -7,6 +7,7 @@ use {
     solana_client::rpc_client::RpcClient,
     solana_sdk::{
         commitment_config::CommitmentConfig,
+        native_token::Sol,
         signature::{read_keypair_file, Keypair, Signer},
     },
 };
@@ -111,11 +112,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let address =
                 pubkey_of(arg_matches, "address").unwrap_or_else(|| config.keypair.pubkey());
             println!(
-                "{} has a balance of {} lamports",
+                "{} has a balance of {}",
                 address,
-                rpc_client
+                Sol(rpc_client
                     .get_balance_with_commitment(&address, config.commitment_config)?
-                    .value
+                    .value)
             );
         }
         _ => unreachable!(),
