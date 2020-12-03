@@ -2,19 +2,21 @@ use {
     clap::{crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand},
     solana_clap_utils::{
         input_parsers::pubkey_of,
-        input_validators::{is_keypair, is_url, is_valid_pubkey},
+        input_validators::{is_url, is_valid_pubkey, is_valid_signer},
+        keypair::DefaultSigner,
     },
     solana_client::rpc_client::RpcClient,
+    solana_remote_wallet::remote_wallet::RemoteWalletManager,
     solana_sdk::{
-        commitment_config::CommitmentConfig,
-        native_token::Sol,
-        signature::{read_keypair_file, Keypair, Signer},
+        commitment_config::CommitmentConfig, message::Message, native_token::Sol,
+        signature::Signer, system_instruction, transaction::Transaction,
     },
+    std::{process::exit, sync::Arc},
 };
 
 struct Config {
     commitment_config: CommitmentConfig,
-    keypair: Keypair,
+    default_signer: Box<dyn Signer>,
     json_rpc_url: String,
     verbose: bool,
 }
@@ -42,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arg::with_name("keypair")
                 .long("keypair")
                 .value_name("KEYPAIR")
-                .validator(is_keypair)
+                .validator(is_valid_signer)
                 .takes_value(true)
                 .global(true)
                 .help("Filepath or URL to a keypair [default: client keypair]"),
@@ -74,10 +76,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .help("Address to get the balance of"),
             ),
         )
+        .subcommand(SubCommand::with_name("ping").about("Send a ping transaction"))
         .get_matches();
 
     let (sub_command, sub_matches) = app_matches.subcommand();
     let matches = sub_matches.unwrap();
+    let mut wallet_manager: Option<Arc<RemoteWalletManager>> = None;
 
     let config = {
         let cli_config = if let Some(config_file) = matches.value_of("config_file") {
@@ -86,16 +90,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             solana_cli_config::Config::default()
         };
 
+        let default_signer = DefaultSigner {
+            path: matches
+                .value_of(&"keypair")
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| cli_config.keypair_path.clone()),
+            arg_name: "keypair".to_string(),
+        };
+
         Config {
             json_rpc_url: matches
                 .value_of("json_rpc_url")
                 .unwrap_or(&cli_config.json_rpc_url)
                 .to_string(),
-            keypair: read_keypair_file(
-                matches
-                    .value_of("keypair")
-                    .unwrap_or(&cli_config.keypair_path),
-            )?,
+            default_signer: default_signer
+                .signer_from_path(&matches, &mut wallet_manager)
+                .unwrap_or_else(|err| {
+                    eprintln!("error: {}", err);
+                    exit(1);
+                }),
             verbose: matches.is_present("verbose"),
             commitment_config: CommitmentConfig::single_gossip(),
         }
@@ -110,7 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             let address =
-                pubkey_of(arg_matches, "address").unwrap_or_else(|| config.keypair.pubkey());
+                pubkey_of(arg_matches, "address").unwrap_or_else(|| config.default_signer.pubkey());
             println!(
                 "{} has a balance of {}",
                 address,
@@ -118,6 +131,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .get_balance_with_commitment(&address, config.commitment_config)?
                     .value)
             );
+        }
+        ("ping", Some(_arg_matches)) => {
+            if config.verbose {
+                println!("JSON RPC URL: {}", config.json_rpc_url);
+            }
+
+            let from = config.default_signer.pubkey();
+            let to = config.default_signer.pubkey();
+            let amount = 0;
+
+            let mut transaction = Transaction::new_unsigned(Message::new(
+                &[system_instruction::transfer(&from, &to, amount)],
+                Some(&config.default_signer.pubkey()),
+            ));
+
+            let (recent_blockhash, _fee_calculator) =
+                rpc_client.get_recent_blockhash().unwrap_or_else(|err| {
+                    eprintln!("error: unable to get recent blockhash: {}", err);
+                    exit(1);
+                });
+
+            transaction
+                .try_sign(&vec![config.default_signer], recent_blockhash)
+                .unwrap_or_else(|err| {
+                    eprintln!("error: failed to sign transaction: {}", err);
+                    exit(1);
+                });
+
+            let signature = rpc_client
+                .send_and_confirm_transaction_with_spinner_and_commitment(
+                    &transaction,
+                    config.commitment_config,
+                )
+                .unwrap_or_else(|err| {
+                    eprintln!("error: send transaction: {}", err);
+                    exit(1);
+                });
+
+            println!("Signature: {}", signature);
         }
         _ => unreachable!(),
     };

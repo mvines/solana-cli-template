@@ -11,6 +11,7 @@ solana-clap-utils = "1.4.14"
 solana-cli-config = "1.4.14"
 solana-client = "1.4.14"
 solana-logger = "1.4.14"
+solana-remote-wallet = "1.4.14"
 solana-sdk = "1.4.14"
 
 [workspace]
