@@ -182,3 +182,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use {super::*, solana_validator::test_validator::*};
+
+    #[test]
+    fn test_ping() {
+        let (test_validator, payer) = TestValidatorGenesis::default().start();
+        let (rpc_client, _recent_blockhash, _fee_calculator) = test_validator.rpc_client();
+
+        assert!(matches!(
+            process_ping(
+                &rpc_client,
+                &payer,
+                CommitmentConfig::single_gossip()
+            ),
+            Ok(_)
+        ));
+    }
+}
