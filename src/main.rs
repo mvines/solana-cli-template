@@ -8,8 +8,12 @@ use {
     solana_client::rpc_client::RpcClient,
     solana_remote_wallet::remote_wallet::RemoteWalletManager,
     solana_sdk::{
-        commitment_config::CommitmentConfig, message::Message, native_token::Sol,
-        signature::Signer, system_instruction, transaction::Transaction,
+        commitment_config::CommitmentConfig,
+        message::Message,
+        native_token::Sol,
+        signature::{Signature, Signer},
+        system_instruction,
+        transaction::Transaction,
     },
     std::{process::exit, sync::Arc},
 };
@@ -19,6 +23,35 @@ struct Config {
     default_signer: Box<dyn Signer>,
     json_rpc_url: String,
     verbose: bool,
+}
+
+fn process_ping(
+    rpc_client: &RpcClient,
+    signer: &dyn Signer,
+    commitment_config: CommitmentConfig,
+) -> Result<Signature, Box<dyn std::error::Error>> {
+    let from = signer.pubkey();
+    let to = signer.pubkey();
+    let amount = 0;
+
+    let mut transaction = Transaction::new_unsigned(Message::new(
+        &[system_instruction::transfer(&from, &to, amount)],
+        Some(&signer.pubkey()),
+    ));
+
+    let (recent_blockhash, _fee_calculator) = rpc_client
+        .get_recent_blockhash()
+        .map_err(|err| format!("error: unable to get recent blockhash: {}", err))?;
+
+    transaction
+        .try_sign(&vec![signer], recent_blockhash)
+        .map_err(|err| format!("error: failed to sign transaction: {}", err))?;
+
+    let signature = rpc_client
+        .send_and_confirm_transaction_with_spinner_and_commitment(&transaction, commitment_config)
+        .map_err(|err| format!("error: send transaction: {}", err))?;
+
+    Ok(signature)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -114,14 +147,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     solana_logger::setup_with_default("solana=info");
+
+    if config.verbose {
+        println!("JSON RPC URL: {}", config.json_rpc_url);
+    }
     let rpc_client = RpcClient::new(config.json_rpc_url.clone());
 
     match (sub_command, sub_matches) {
         ("balance", Some(arg_matches)) => {
-            if config.verbose {
-                println!("JSON RPC URL: {}", config.json_rpc_url);
-            }
-
             let address =
                 pubkey_of(arg_matches, "address").unwrap_or_else(|| config.default_signer.pubkey());
             println!(
@@ -133,42 +166,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
         ("ping", Some(_arg_matches)) => {
-            if config.verbose {
-                println!("JSON RPC URL: {}", config.json_rpc_url);
-            }
-
-            let from = config.default_signer.pubkey();
-            let to = config.default_signer.pubkey();
-            let amount = 0;
-
-            let mut transaction = Transaction::new_unsigned(Message::new(
-                &[system_instruction::transfer(&from, &to, amount)],
-                Some(&config.default_signer.pubkey()),
-            ));
-
-            let (recent_blockhash, _fee_calculator) =
-                rpc_client.get_recent_blockhash().unwrap_or_else(|err| {
-                    eprintln!("error: unable to get recent blockhash: {}", err);
-                    exit(1);
-                });
-
-            transaction
-                .try_sign(&vec![config.default_signer], recent_blockhash)
-                .unwrap_or_else(|err| {
-                    eprintln!("error: failed to sign transaction: {}", err);
-                    exit(1);
-                });
-
-            let signature = rpc_client
-                .send_and_confirm_transaction_with_spinner_and_commitment(
-                    &transaction,
-                    config.commitment_config,
-                )
-                .unwrap_or_else(|err| {
-                    eprintln!("error: send transaction: {}", err);
-                    exit(1);
-                });
-
+            let signature = process_ping(
+                &rpc_client,
+                config.default_signer.as_ref(),
+                config.commitment_config,
+            )
+            .unwrap_or_else(|err| {
+                eprintln!("error: send transaction: {}", err);
+                exit(1);
+            });
             println!("Signature: {}", signature);
         }
         _ => unreachable!(),
