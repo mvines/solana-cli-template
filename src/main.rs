@@ -143,7 +143,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     exit(1);
                 }),
             verbose: matches.is_present("verbose"),
-            commitment_config: CommitmentConfig::single_gossip(),
+            commitment_config: CommitmentConfig::confirmed(),
         }
     };
     solana_logger::setup_with_default("solana=info");
