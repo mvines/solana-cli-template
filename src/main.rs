@@ -54,7 +54,8 @@ fn process_ping(
     Ok(signature)
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_matches = App::new(crate_name!())
         .about(crate_description!())
         .version(crate_version!())
