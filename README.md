@@ -11,28 +11,28 @@ It provides three pieces of functionality:
 - `help`: Tips for using the app. This is an off-chain operation.
 
 ## Local step-by-step
-1. Preparep account:
-  - Start a local node: `solana test validator`.
+1. Prepare account:
+  - Start a local node: run `solana-test-validator`.
   - Generate a keypair: `solana-keygen new -o test.json`.
   - Add 100 SOL to the corresponding account `solana airdrop --url http://127.0.0.1:8899 --keypair test.json 100`.
 
-2. Bulid app: `cargo run`.
+2. Build app: `cargo run`.
 
 3. Ping:
   ```
-  $ ./target/debug/cli-template ping --url http://127.0.0.1:8899 --keypair test.json
+  $ cargo run -- ping --url http://127.0.0.1:8899 --keypair test.json
   Signature: 2Y863JX96RTqbeGfcvQowVt1V91Dgs2LZfVgQ3mGJPmYu24sUTYmfkArHAAgj4uFqP75bm9GXU9DYjiMFxahQJUC
   ```
 
 4. Balance:
   ```
-  $ ./target/debug/cli-template balance --url http://127.0.0.1:8899 --keypair test.json
+  $ cargo run -- balance --url http://127.0.0.1:8899 --keypair test.json
   3dSRGE3wYCcGWFrxAsQs5PaBqtJzzxdTzY2ypXNFUji9 has a balance of ◎99.999995000 // balance less than 100 because of ping operation above
   ```
 
 5. Run help for the complete list of options:
   ```
-  $ ./target/debug/cli-template --help
+  $ cargo run -- --help
   cli-template 0.1.0
 
 
