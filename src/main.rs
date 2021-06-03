@@ -2,7 +2,9 @@ use {
     clap::{crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand},
     solana_clap_utils::{
         input_parsers::pubkey_of,
-        input_validators::{is_url, is_valid_pubkey, is_valid_signer},
+        input_validators::{
+            is_url_or_moniker, is_valid_pubkey, is_valid_signer, normalize_to_url_if_moniker,
+        },
         keypair::DefaultSigner,
     },
     solana_client::rpc_client::RpcClient,
@@ -93,11 +95,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .arg(
             Arg::with_name("json_rpc_url")
+                .short("u")
                 .long("url")
                 .value_name("URL")
                 .takes_value(true)
                 .global(true)
-                .validator(is_url)
+                .validator(is_url_or_moniker)
                 .help("JSON RPC URL for the cluster [default: value from configuration file]"),
         )
         .subcommand(
@@ -133,10 +136,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         Config {
-            json_rpc_url: matches
-                .value_of("json_rpc_url")
-                .unwrap_or(&cli_config.json_rpc_url)
-                .to_string(),
+            json_rpc_url: normalize_to_url_if_moniker(
+                matches
+                    .value_of("json_rpc_url")
+                    .unwrap_or(&cli_config.json_rpc_url)
+                    .to_string(),
+            ),
             default_signer: default_signer
                 .signer_from_path(&matches, &mut wallet_manager)
                 .unwrap_or_else(|err| {
@@ -194,11 +199,7 @@ mod test {
         let (rpc_client, _recent_blockhash, _fee_calculator) = test_validator.rpc_client();
 
         assert!(matches!(
-            process_ping(
-                &rpc_client,
-                &payer,
-                CommitmentConfig::single_gossip()
-            ),
+            process_ping(&rpc_client, &payer, CommitmentConfig::single_gossip()),
             Ok(_)
         ));
     }
