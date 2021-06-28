@@ -2,6 +2,10 @@
 1. Install Rust from https://rustup.rs/
 2. `cargo run`
 
+## Want Batteries Included?
+
+This template is intentionally minimal. For a template that's more functional out of the box, try https://github.com/hashblock/solana-cli-program-template
+
 ## About
 `solana-cli-template` is a sample app demonstrating the creation of a minimal CLI application written in Rust to interact with Solana.
 It provides three pieces of functionality:
