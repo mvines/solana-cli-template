@@ -30,7 +30,6 @@ struct Config {
 fn process_ping(
     rpc_client: &RpcClient,
     signer: &dyn Signer,
-    commitment_config: CommitmentConfig,
 ) -> Result<Signature, Box<dyn std::error::Error>> {
     let from = signer.pubkey();
     let to = signer.pubkey();
@@ -50,7 +49,7 @@ fn process_ping(
         .map_err(|err| format!("error: failed to sign transaction: {}", err))?;
 
     let signature = rpc_client
-        .send_and_confirm_transaction_with_spinner_and_commitment(&transaction, commitment_config)
+        .send_and_confirm_transaction_with_spinner(&transaction)
         .map_err(|err| format!("error: send transaction: {}", err))?;
 
     Ok(signature)
@@ -157,7 +156,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if config.verbose {
         println!("JSON RPC URL: {}", config.json_rpc_url);
     }
-    let rpc_client = RpcClient::new(config.json_rpc_url.clone());
+    let rpc_client =
+        RpcClient::new_with_commitment(config.json_rpc_url.clone(), config.commitment_config);
 
     match (sub_command, sub_matches) {
         ("balance", Some(arg_matches)) => {
@@ -166,21 +166,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!(
                 "{} has a balance of {}",
                 address,
-                Sol(rpc_client
-                    .get_balance_with_commitment(&address, config.commitment_config)?
-                    .value)
+                Sol(rpc_client.get_balance(&address)?)
             );
         }
         ("ping", Some(_arg_matches)) => {
-            let signature = process_ping(
-                &rpc_client,
-                config.default_signer.as_ref(),
-                config.commitment_config,
-            )
-            .unwrap_or_else(|err| {
-                eprintln!("error: send transaction: {}", err);
-                exit(1);
-            });
+            let signature = process_ping(&rpc_client, config.default_signer.as_ref())
+                .unwrap_or_else(|err| {
+                    eprintln!("error: send transaction: {}", err);
+                    exit(1);
+                });
             println!("Signature: {}", signature);
         }
         _ => unreachable!(),
@@ -198,9 +192,6 @@ mod test {
         let (test_validator, payer) = TestValidatorGenesis::default().start();
         let (rpc_client, _recent_blockhash, _fee_calculator) = test_validator.rpc_client();
 
-        assert!(matches!(
-            process_ping(&rpc_client, &payer, CommitmentConfig::single_gossip()),
-            Ok(_)
-        ));
+        assert!(matches!(process_ping(&rpc_client, &payer), Ok(_)));
     }
 }
