@@ -40,12 +40,12 @@ fn process_ping(
         Some(&signer.pubkey()),
     ));
 
-    let (recent_blockhash, _fee_calculator) = rpc_client
-        .get_recent_blockhash()
-        .map_err(|err| format!("error: unable to get recent blockhash: {}", err))?;
+    let blockhash = rpc_client
+        .get_latest_blockhash()
+        .map_err(|err| format!("error: unable to get latest blockhash: {}", err))?;
 
     transaction
-        .try_sign(&vec![signer], recent_blockhash)
+        .try_sign(&vec![signer], blockhash)
         .map_err(|err| format!("error: failed to sign transaction: {}", err))?;
 
     let signature = rpc_client
@@ -190,7 +190,7 @@ mod test {
     #[test]
     fn test_ping() {
         let (test_validator, payer) = TestValidatorGenesis::default().start();
-        let (rpc_client, _recent_blockhash, _fee_calculator) = test_validator.rpc_client();
+        let rpc_client = test_validator.get_rpc_client();
 
         assert!(matches!(process_ping(&rpc_client, &payer), Ok(_)));
     }
