@@ -7,7 +7,7 @@ use {
         },
         keypair::DefaultSigner,
     },
-    solana_client::rpc_client::RpcClient,
+    solana_client::nonblocking::rpc_client::RpcClient,
     solana_remote_wallet::remote_wallet::RemoteWalletManager,
     solana_sdk::{
         commitment_config::CommitmentConfig,
@@ -27,7 +27,7 @@ struct Config {
     verbose: bool,
 }
 
-fn process_ping(
+async fn process_ping(
     rpc_client: &RpcClient,
     signer: &dyn Signer,
 ) -> Result<Signature, Box<dyn std::error::Error>> {
@@ -42,6 +42,7 @@ fn process_ping(
 
     let blockhash = rpc_client
         .get_latest_blockhash()
+        .await
         .map_err(|err| format!("error: unable to get latest blockhash: {}", err))?;
 
     transaction
@@ -50,6 +51,7 @@ fn process_ping(
 
     let signature = rpc_client
         .send_and_confirm_transaction_with_spinner(&transaction)
+        .await
         .map_err(|err| format!("error: send transaction: {}", err))?;
 
     Ok(signature)
@@ -166,11 +168,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!(
                 "{} has a balance of {}",
                 address,
-                Sol(rpc_client.get_balance(&address)?)
+                Sol(rpc_client.get_balance(&address).await?)
             );
         }
         ("ping", Some(_arg_matches)) => {
             let signature = process_ping(&rpc_client, config.default_signer.as_ref())
+                .await
                 .unwrap_or_else(|err| {
                     eprintln!("error: send transaction: {}", err);
                     exit(1);
@@ -187,11 +190,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod test {
     use {super::*, solana_validator::test_validator::*};
 
-    #[test]
-    fn test_ping() {
-        let (test_validator, payer) = TestValidatorGenesis::default().start();
-        let rpc_client = test_validator.get_rpc_client();
+    #[tokio::test]
+    async fn test_ping() {
+        let (test_validator, payer) = TestValidatorGenesis::default().start_async().await;
+        let rpc_client = test_validator.get_async_rpc_client();
 
-        assert!(matches!(process_ping(&rpc_client, &payer), Ok(_)));
+        assert!(matches!(process_ping(&rpc_client, &payer).await, Ok(_)));
     }
 }
