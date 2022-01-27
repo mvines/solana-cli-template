@@ -58,4 +58,4 @@ PATCH
   fi
 done
 
-./update-solana-dependencies.sh "$solana_ver"
+DIRTY_OK=1 ./update-solana-dependencies.sh "$solana_ver"
