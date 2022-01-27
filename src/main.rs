@@ -1,5 +1,6 @@
 use {
     clap::{crate_description, crate_name, crate_version, Arg, Command},
+    futures_util::StreamExt,
     solana_clap_v3_utils::{
         input_parsers::pubkey_of,
         input_validators::{
@@ -7,7 +8,10 @@ use {
         },
         keypair::DefaultSigner,
     },
-    solana_client::nonblocking::rpc_client::RpcClient,
+    solana_client::{
+        nonblocking::{pubsub_client::PubsubClient, rpc_client::RpcClient},
+        rpc_config::{RpcTransactionLogsConfig, RpcTransactionLogsFilter},
+    },
     solana_remote_wallet::remote_wallet::RemoteWalletManager,
     solana_sdk::{
         commitment_config::CommitmentConfig,
@@ -25,6 +29,7 @@ struct Config {
     default_signer: Box<dyn Signer>,
     json_rpc_url: String,
     verbose: bool,
+    websocket_url: String,
 }
 
 async fn process_ping(
@@ -55,6 +60,37 @@ async fn process_ping(
         .map_err(|err| format!("error: send transaction: {}", err))?;
 
     Ok(signature)
+}
+
+async fn process_logs(websocket_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let pubsub_client = PubsubClient::new(websocket_url).await?;
+
+    let (mut logs, logs_unsubscribe) = pubsub_client
+        .logs_subscribe(
+            RpcTransactionLogsFilter::All,
+            RpcTransactionLogsConfig {
+                commitment: Some(CommitmentConfig::confirmed()),
+            },
+        )
+        .await?;
+
+    while let Some(log) = logs.next().await {
+        println!("Transaction executed in slot {}:", log.context.slot);
+        println!("  Signature: {}:", log.value.signature);
+        println!(
+            "  Status: {}",
+            log.value
+                .err
+                .map(|err| err.to_string())
+                .unwrap_or_else(|| "Success".into())
+        );
+        println!("  Log Messages:");
+        for msg in log.value.logs {
+            println!("    {}", msg);
+        }
+    }
+    logs_unsubscribe().await;
+    Ok(())
 }
 
 #[tokio::main]
@@ -116,6 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ),
         )
         .subcommand(Command::new("ping").about("Send a ping transaction"))
+        .subcommand(Command::new("logs").about("Stream transaction logs"))
         .get_matches();
 
     let (command, matches) = app_matches.subcommand().unwrap();
@@ -136,26 +173,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap_or_else(|| cli_config.keypair_path.clone()),
         );
 
+        let json_rpc_url = normalize_to_url_if_moniker(
+            matches
+                .value_of("json_rpc_url")
+                .unwrap_or(&cli_config.json_rpc_url),
+        );
+
+        let websocket_url = solana_cli_config::Config::compute_websocket_url(&json_rpc_url);
         Config {
-            json_rpc_url: normalize_to_url_if_moniker(
-                matches
-                    .value_of("json_rpc_url")
-                    .unwrap_or(&cli_config.json_rpc_url),
-            ),
+            commitment_config: CommitmentConfig::confirmed(),
             default_signer: default_signer
                 .signer_from_path(matches, &mut wallet_manager)
                 .unwrap_or_else(|err| {
                     eprintln!("error: {}", err);
                     exit(1);
                 }),
+            json_rpc_url,
             verbose: matches.is_present("verbose"),
-            commitment_config: CommitmentConfig::confirmed(),
+            websocket_url,
         }
     };
     solana_logger::setup_with_default("solana=info");
 
     if config.verbose {
         println!("JSON RPC URL: {}", config.json_rpc_url);
+        println!("Websocket URL: {}", config.websocket_url);
     }
     let rpc_client =
         RpcClient::new_with_commitment(config.json_rpc_url.clone(), config.commitment_config);
@@ -169,6 +211,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 address,
                 Sol(rpc_client.get_balance(&address).await?)
             );
+        }
+        ("logs", _arg_matches) => {
+            process_logs(&config.websocket_url)
+                .await
+                .unwrap_or_else(|err| {
+                    eprintln!("error: {}", err);
+                    exit(1);
+                });
         }
         ("ping", _arg_matches) => {
             let signature = process_ping(&rpc_client, config.default_signer.as_ref())
