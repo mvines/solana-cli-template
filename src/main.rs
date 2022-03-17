@@ -138,8 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             json_rpc_url: normalize_to_url_if_moniker(
                 matches
                     .value_of("json_rpc_url")
-                    .unwrap_or(&cli_config.json_rpc_url)
-                    .to_string(),
+                    .unwrap_or(&cli_config.json_rpc_url),
             ),
             default_signer: default_signer
                 .signer_from_path(matches, &mut wallet_manager)
