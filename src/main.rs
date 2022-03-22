@@ -1,6 +1,6 @@
 use {
-    clap::{crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand},
-    solana_clap_utils::{
+    clap::{crate_description, crate_name, crate_version, Arg, Command},
+    solana_clap_v3_utils::{
         input_parsers::pubkey_of,
         input_validators::{
             is_url_or_moniker, is_valid_pubkey, is_valid_signer, normalize_to_url_if_moniker,
@@ -57,13 +57,14 @@ fn process_ping(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_matches = App::new(crate_name!())
+    let app_matches = Command::new(crate_name!())
         .about(crate_description!())
         .version(crate_version!())
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .subcommand_required(true)
+        .arg_required_else_help(true)
         .arg({
-            let arg = Arg::with_name("config_file")
-                .short("C")
+            let arg = Arg::new("config_file")
+                .short('C')
                 .long("config")
                 .value_name("PATH")
                 .takes_value(true)
@@ -76,47 +77,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .arg(
-            Arg::with_name("keypair")
+            Arg::new("keypair")
                 .long("keypair")
                 .value_name("KEYPAIR")
-                .validator(is_valid_signer)
+                .validator(|s| is_valid_signer(s))
                 .takes_value(true)
                 .global(true)
                 .help("Filepath or URL to a keypair [default: client keypair]"),
         )
         .arg(
-            Arg::with_name("verbose")
+            Arg::new("verbose")
                 .long("verbose")
-                .short("v")
+                .short('v')
                 .takes_value(false)
                 .global(true)
                 .help("Show additional information"),
         )
         .arg(
-            Arg::with_name("json_rpc_url")
-                .short("u")
+            Arg::new("json_rpc_url")
+                .short('u')
                 .long("url")
                 .value_name("URL")
                 .takes_value(true)
                 .global(true)
-                .validator(is_url_or_moniker)
+                .validator(|s| is_url_or_moniker(s))
                 .help("JSON RPC URL for the cluster [default: value from configuration file]"),
         )
         .subcommand(
-            SubCommand::with_name("balance").about("Get balance").arg(
-                Arg::with_name("address")
-                    .validator(is_valid_pubkey)
+            Command::new("balance").about("Get balance").arg(
+                Arg::new("address")
+                    .validator(|s| is_valid_pubkey(s))
                     .value_name("ADDRESS")
                     .takes_value(true)
                     .index(1)
                     .help("Address to get the balance of"),
             ),
         )
-        .subcommand(SubCommand::with_name("ping").about("Send a ping transaction"))
+        .subcommand(Command::new("ping").about("Send a ping transaction"))
         .get_matches();
 
-    let (sub_command, sub_matches) = app_matches.subcommand();
-    let matches = sub_matches.unwrap();
+    let (command, matches) = app_matches.subcommand().unwrap();
     let mut wallet_manager: Option<Arc<RemoteWalletManager>> = None;
 
     let config = {
@@ -158,8 +158,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_client =
         RpcClient::new_with_commitment(config.json_rpc_url.clone(), config.commitment_config);
 
-    match (sub_command, sub_matches) {
-        ("balance", Some(arg_matches)) => {
+    match (command, matches) {
+        ("balance", arg_matches) => {
             let address =
                 pubkey_of(arg_matches, "address").unwrap_or_else(|| config.default_signer.pubkey());
             println!(
@@ -168,7 +168,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Sol(rpc_client.get_balance(&address)?)
             );
         }
-        ("ping", Some(_arg_matches)) => {
+        ("ping", _arg_matches) => {
             let signature = process_ping(&rpc_client, config.default_signer.as_ref())
                 .unwrap_or_else(|err| {
                     eprintln!("error: send transaction: {}", err);

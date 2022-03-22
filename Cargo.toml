@@ -6,8 +6,8 @@ license = "WTFPL"
 publish = false
 
 [dependencies]
-clap = "2.33.3"
-solana-clap-utils = "=1.11.1"
+clap = { version = "3", features = ["cargo"]}
+solana-clap-v3-utils = "=1.11.1"
 solana-cli-config = "=1.11.1"
 solana-client = "=1.11.1"
 solana-logger = "=1.11.1"
