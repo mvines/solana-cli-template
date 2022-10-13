@@ -47,6 +47,7 @@ crates=(
   solana-runtime
   solana-sdk
   solana-stake-program
+  solana-test-validator
   solana-transaction-status
   solana-validator
 )

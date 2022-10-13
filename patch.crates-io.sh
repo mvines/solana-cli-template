@@ -39,6 +39,7 @@ solana-banks-client = { path = "$solana_dir/banks-client"}
 solana-banks-server = { path = "$solana_dir/banks-server"}
 solana-bpf-loader-program = { path = "$solana_dir/programs/bpf_loader" }
 solana-clap-utils = {path = "$solana_dir/clap-utils" }
+solana-clap-v3-utils = {path = "$solana_dir/clap-v3-utils" }
 solana-cli-config = {path = "$solana_dir/cli-config" }
 solana-cli-output = {path = "$solana_dir/cli-output" }
 solana-client = { path = "$solana_dir/client"}
@@ -51,9 +52,11 @@ solana-program-test = { path = "$solana_dir/program-test" }
 solana-runtime = { path = "$solana_dir/runtime" }
 solana-sdk = { path = "$solana_dir/sdk" }
 solana-stake-program = { path = "$solana_dir/programs/stake" }
+solana-test-validator = { path = "$solana_dir/test-validator" }
 solana-transaction-status = { path = "$solana_dir/transaction-status" }
 solana-validator = { path = "$solana_dir/validator" }
 solana-vote-program = { path = "$solana_dir/programs/vote" }
+solana-zk-token-sdk = { path = "$solana_dir/zk-token-sdk" }
 PATCH
   fi
 done
