@@ -48,16 +48,16 @@ async fn process_ping(
     let blockhash = rpc_client
         .get_latest_blockhash()
         .await
-        .map_err(|err| format!("error: unable to get latest blockhash: {}", err))?;
+        .map_err(|err| format!("error: unable to get latest blockhash: {err}"))?;
 
     transaction
         .try_sign(&vec![signer], blockhash)
-        .map_err(|err| format!("error: failed to sign transaction: {}", err))?;
+        .map_err(|err| format!("error: failed to sign transaction: {err}"))?;
 
     let signature = rpc_client
         .send_and_confirm_transaction_with_spinner(&transaction)
         .await
-        .map_err(|err| format!("error: send transaction: {}", err))?;
+        .map_err(|err| format!("error: send transaction: {err}"))?;
 
     Ok(signature)
 }
@@ -86,7 +86,7 @@ async fn process_logs(websocket_url: &str) -> Result<(), Box<dyn std::error::Err
         );
         println!("  Log Messages:");
         for msg in log.value.logs {
-            println!("    {}", msg);
+            println!("    {msg}");
         }
     }
     logs_unsubscribe().await;
@@ -168,7 +168,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let default_signer = DefaultSigner::new(
             "keypair",
             matches
-                .value_of(&"keypair")
+                .value_of("keypair")
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| cli_config.keypair_path.clone()),
         );
@@ -185,7 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             default_signer: default_signer
                 .signer_from_path(matches, &mut wallet_manager)
                 .unwrap_or_else(|err| {
-                    eprintln!("error: {}", err);
+                    eprintln!("error: {err}");
                     exit(1);
                 }),
             json_rpc_url,
@@ -216,7 +216,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             process_logs(&config.websocket_url)
                 .await
                 .unwrap_or_else(|err| {
-                    eprintln!("error: {}", err);
+                    eprintln!("error: {err}");
                     exit(1);
                 });
         }
@@ -224,10 +224,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let signature = process_ping(&rpc_client, config.default_signer.as_ref())
                 .await
                 .unwrap_or_else(|err| {
-                    eprintln!("error: send transaction: {}", err);
+                    eprintln!("error: send transaction: {err}");
                     exit(1);
                 });
-            println!("Signature: {}", signature);
+            println!("Signature: {signature}");
         }
         _ => unreachable!(),
     };
