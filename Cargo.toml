@@ -8,15 +8,15 @@ publish = false
 [dependencies]
 clap = { version = "3", features = ["cargo"] }
 futures-util = "0.3.19"
-solana-clap-v3-utils = "=1.17.3"
-solana-cli-config = "=1.17.3"
-solana-client = "=1.17.3"
-solana-logger = "=1.17.3"
-solana-remote-wallet = "=1.17.3"
-solana-sdk = "=1.17.3"
+solana-clap-v3-utils = "=2.0.2"
+solana-cli-config = "=2.0.2"
+solana-client = "=2.0.2"
+solana-logger = "=2.0.2"
+solana-remote-wallet = "=2.0.2"
+solana-sdk = "=2.0.2"
 tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
-solana-test-validator = "=1.17.3"
+solana-test-validator = "=2.0.2"
 
 [workspace]
